@@ -24,7 +24,7 @@ https://viewsourcecode.org/snaptoken/kilo/index.html
 /*defines*/
 #define CTRL_KEY(k) ((k) & 0x1f)
 
-#define JUJUBE_VERSION "0.0.1"
+#define JUJUBE_VERSION "1.0.1"
 #define JUJUBE_TAB_STOP 8
 #define JUJUBE_QUIT_TIMES 3
 
@@ -51,8 +51,8 @@ enum editorHighlight{
     HL_MATCH
 };
 
-#define HL_HIGHLIGHT_NUMBERS (1<<0)
-#define HL_HIGHLIGHT_STRINGS (1<<1)
+#define HL_HIGHLIGHT_NUMBERS (3<<0)
+#define HL_HIGHLIGHT_STRINGS (3<<1)
 /*Data*/
 struct editorSyntax {
     char * filetype;
@@ -102,6 +102,19 @@ char *C_HL_keywords[] = {
     "struct", "union", "typedef", "static", "enum", "class", "case",
     "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", NULL 
 };
+char *PY_HL_extensions[] = {".py", NULL};
+char *PY_HL_keywords[] = {
+    "if", "while", "for", "in", "def", "break", "print", "return", "elif", "else", "int|", "double|", "bool|",
+    "reverse", "map", "split", "class", "None", "enum|", "import", "as", "range", "True|", "False|", 
+    NULL
+};
+
+char *RB_HL_extensions[] = {".rb", NULL};
+char *RB_HL_keywords[] = {
+    "if", "while", "for", "end", "each", "gets", "chomp", "Array|", "Hash|", "new", "true|", "false|" ,
+    "upcase", "downcase", "capitalize", "length", "reverse", "def", "do", "loop",
+    NULL
+};
 
 struct editorSyntax HLDB[] = {
     {
@@ -111,6 +124,21 @@ struct editorSyntax HLDB[] = {
         "//", "/*", "*/",
         HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
     },
+    {
+        "python",
+        PY_HL_extensions,
+        PY_HL_keywords,
+        "#", "'''", "'''",
+        HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
+        
+    },
+    {
+        "ruby",
+        RB_HL_extensions,
+        RB_HL_keywords,
+        "#", "=begin", "=end",
+        HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
+    }
 };
 #define HLDB_ENTRIES (sizeof(HLDB) / sizeof(HLDB[0]))
 
