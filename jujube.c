@@ -3,7 +3,7 @@
 Created using this tutorial:
 https://viewsourcecode.org/snaptoken/kilo/index.html
 */
-
+/*TODO: Comment/Document functions for clarity later*/
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #define _GNU_SOURCE
@@ -40,10 +40,12 @@ enum editorKey{
     PAGE_UP,
     PAGE_DOWN
 };
+/*syntax highlight types*/
+
 enum editorHighlight{
     HL_NORMAL = 0,
     HL_COMMENT,
-    HL_MLCOMMENT,
+    HL_MLCOMMENT, //multi-line comments
     HL_KEYWORD1,
     HL_KEYWORD2,
     HL_STRING,
@@ -64,7 +66,7 @@ struct editorSyntax {
     int flags;
 };
 
-
+/*editor row structure*/
 typedef struct erow{
     int idx;
     int size;
@@ -86,9 +88,9 @@ struct editorConfig {
     int screencols;
     int numrows;
     erow *row;
-    int dirty;
+    int dirty; //set if file has been edited without a save
     char *filename;
-    char statusmsg[80];
+    char statusmsg[80]; //status message in bottom row
     time_t statusmsg_time;
     struct editorSyntax *syntax;
     struct termios orig_termios;
@@ -96,19 +98,21 @@ struct editorConfig {
 
 struct editorConfig E;
 /*** filetypes ***/
+// C
 char *C_HL_extensions[] = {".c", ".h", ".cpp", NULL};
 char *C_HL_keywords[] = {
     "switch", "if", "while", "for", "break", "continue", "return", "else",
     "struct", "union", "typedef", "static", "enum", "class", "case",
-    "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", NULL 
+    "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "#define", "#include", NULL 
 };
+// Python
 char *PY_HL_extensions[] = {".py", NULL};
 char *PY_HL_keywords[] = {
     "if", "while", "for", "in", "def", "break", "print", "return", "elif", "else", "int|", "double|", "bool|",
     "reverse", "map", "split", "class", "None", "enum|", "import", "as", "range", "True|", "False|", 
     NULL
 };
-
+// Ruby
 char *RB_HL_extensions[] = {".rb", NULL};
 char *RB_HL_keywords[] = {
     "if", "while", "for", "end", "each", "gets", "chomp", "Array|", "Hash|", "new", "true|", "false|" ,
@@ -116,6 +120,8 @@ char *RB_HL_keywords[] = {
     NULL
 };
 
+// Attaching highlights to each languages specific syntax(keywords, comment types, etc.) 
+// based on the open files extension
 struct editorSyntax HLDB[] = {
     {
         "c",
@@ -178,13 +184,14 @@ void enableRawMode(){
     if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
+/*process key presses(both alphanumeric and nonalphanumeric such as arrow keys)*/
 int editorReadKey(){
     int nread;
     char c;
     while((nread = read(STDIN_FILENO, &c, 1)) != 1){
         if(nread == -1 && errno != EAGAIN) die("read");
     }
-
+    // escape sequence means a nonalphanumeric key was pressed
     if(c == '\x1b'){
         char seq[3];
 
@@ -231,7 +238,7 @@ int editorReadKey(){
     return c;
 }
 
-
+/*return current position of cursor in the file*/
 int getCursorPosition(int *rows, int *cols){
 
     char buf[32];
@@ -249,7 +256,7 @@ int getCursorPosition(int *rows, int *cols){
     return 0;
 }
 
-
+/*get current window size - used when adapting editor UI to different sized windows*/
 int getWindowSize(int *rows, int *cols){
     struct winsize ws;
 
@@ -270,6 +277,8 @@ int is_separator(int c){
     return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
 }
 
+// update a file row with the files required syntax highlighting
+// done row by row when rendering a file view
 void editorUpdateSyntax(erow *row){
     row->hl = realloc(row->hl, row->rsize);
     memset(row->hl, HL_NORMAL, row->rsize);
@@ -290,6 +299,7 @@ void editorUpdateSyntax(erow *row){
     int in_comment = (row->idx > 0 && E.row[row->idx - 1].hl_open_comment);
 
     int i = 0;
+    // work word by word in the row
     while( i < row->rsize){
         char c = row->render[i];
         unsigned char prev_hl = (i > 0) ? row->hl[i - 1] : HL_NORMAL;
@@ -301,7 +311,7 @@ void editorUpdateSyntax(erow *row){
             }
         }
         if(mcs_len && mce_len && !in_string){
-            if(in_comment){
+            if(in_comment){ 
                 row->hl[i] = HL_MLCOMMENT;
                 //check if at the end of a multi-line comment
                 if(!strncmp(&row->render[i], mce, mce_len)){
@@ -406,6 +416,7 @@ int editorSyntaxToColor(int hl){
     }
 }
 
+/*Select the syntax highlighting to use by selecting the file's extension from the supported language types*/
 void editorSelectSyntaxHighlight(){
     E.syntax = NULL;
     if(E.filename == NULL) return;
@@ -460,7 +471,7 @@ int editorRowRxToCx(erow *row, int rx){
 }
 
 
-
+// update a row in the file when it has been changed in the editor
 void editorUpdateRow(erow *row){
     int tabs = 0;
     int j;
@@ -482,9 +493,10 @@ void editorUpdateRow(erow *row){
     }
     row->render[idx] = '\0';
     row->rsize = idx;
+    // update the edited rows syntax highlighting
     editorUpdateSyntax(row);
 }
-
+// user inserts a newline into the file, and a new erow into the editor's file setup
 void editorInsertRow( int at, char *s, size_t len){
     if(at < 0 || at > E.numrows) return;
 
@@ -509,12 +521,13 @@ void editorInsertRow( int at, char *s, size_t len){
     E.dirty++;
 }
 
+// free a row after it has been removed from a file
 void editorFreeRow(erow *row){
     free(row->render);
     free(row->chars);
     free(row->hl);
 }
-
+// a row is removed from the file
 void editorDelRow(int at){
     if(at < 0 || at >= E.numrows) return;
     editorFreeRow(&E.row[at]);
@@ -523,7 +536,7 @@ void editorDelRow(int at){
     E.numrows--;
     E.dirty++;
 }
-
+// user presses a letter key; resize row to fit new char, add char, call update
 void editorRowInsertChar(erow *row, int at, int c){
     if(at < 0 || at > row->size) at = row->size;
     row->chars = realloc(row->chars, row->size + 2);
@@ -534,6 +547,8 @@ void editorRowInsertChar(erow *row, int at, int c){
     E.dirty++;
 }
 
+// append a string another row; happens if a line with content is deleted,
+// with its contents added to the previous row
 void editorRowAppendString(erow *row, char *s, size_t len){
     row->chars = realloc(row->chars, row->size + len + 1);
     memcpy(&row->chars[row->size], s, len);
@@ -543,7 +558,7 @@ void editorRowAppendString(erow *row, char *s, size_t len){
     E.dirty++;
 }
 
-
+// user removes a char
 void editorRowDelChar(erow *row, int at){
     if(at < 0 || at >= row->size) return;
     memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
@@ -553,7 +568,8 @@ void editorRowDelChar(erow *row, int at){
 }
 
 /* editor operations */
-
+// called directly when user presses alphanumeric key;
+// if row was empty add new row, otherwise update existing row
 void editorInsertChar(int c){
     if(E.cy == E.numrows){
         editorInsertRow(E.numrows, "", 0);
@@ -562,6 +578,7 @@ void editorInsertChar(int c){
     E.cx++;
 }
 
+// user adds a newline
 void editorInsertNewline(){
     if(E.cx == 0){
         editorInsertRow(E.cy, "", 0);
